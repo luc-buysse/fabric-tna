@@ -6,6 +6,7 @@ package org.stratumproject.fabric.tna.behaviour.pipeliner;
 import com.google.common.collect.Lists;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.VlanId;
+import org.onlab.packet.MacAddress;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.DefaultTrafficSelector;
@@ -55,6 +56,8 @@ import static org.stratumproject.fabric.tna.behaviour.FabricUtils.criterion;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.l2Instruction;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.l2Instructions;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.outputPort;
+import static org.stratumproject.fabric.tna.behaviour.FabricUtils.srcMac;
+import static org.stratumproject.fabric.tna.behaviour.FabricUtils.dstMac;
 
 /**
  * ObjectiveTranslator implementation for NextObjective.
@@ -77,9 +80,11 @@ class NextObjectiveTranslator
 
         switch (obj.type()) {
             case SIMPLE:
+
                 simpleNext(obj, resultBuilder, false);
                 break;
             case HASHED:
+
                 hashedNext(obj, resultBuilder);
                 break;
             case BROADCAST:
@@ -98,6 +103,8 @@ class NextObjectiveTranslator
         }
 
         if (!isGroupModifyOp(obj)) {
+            log.info("GROUP MODIFY");
+
             // Generate next VLAN rules.
             nextMpls(obj, resultBuilder);
             nextVlan(obj, resultBuilder);
@@ -259,36 +266,13 @@ class NextObjectiveTranslator
             throws FabricPipelinerException {
 
         if (!capabilities.hasHashedTable()) {
+            log.info("Doing simple next...");
+
             simpleNext(obj, resultBuilder, true);
             return;
         }
 
-        // Updated result builder with hashed group or indirect group
-        // use indirect group allow us to optimize the resource in those
-        // devices that preallocate memory based on the maxGroupSize
-        final int groupId;
-        if (obj.type() == NextObjective.Type.HASHED) {
-            groupId = selectGroup(obj, resultBuilder);
-        } else if (obj.type() == NextObjective.Type.SIMPLE) {
-            groupId = indirectGroup(obj, resultBuilder);
-        } else {
-            throw new FabricPipelinerException("Cannot translate BROADCAST next objective" +
-                    "into hashedNext actions");
-        }
-
-        if (isGroupModifyOp(obj) || obj.op() == Objective.Operation.VERIFY) {
-            // No changes to flow rules.
-            return;
-        }
-
-        final TrafficSelector selector = nextIdSelector(obj.id());
-        final TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                .piTableAction(PiActionProfileGroupId.of(groupId))
-                .build();
-
-        resultBuilder.addFlowRule(flowRule(
-                obj, P4InfoConstants.FABRIC_INGRESS_NEXT_HASHED,
-                selector, treatment));
+        selectGroup(obj, resultBuilder);
     }
 
     private void handleEgress(NextObjective obj, TrafficTreatment treatment,
@@ -298,6 +282,8 @@ class NextObjectiveTranslator
         final PortNumber outPort = outputPort(treatment);
         final Instruction popVlanInst = l2Instruction(treatment, VLAN_POP);
         if (outPort != null) {
+            log.info("Number of instructions : {}", treatment.allInstructions().size());
+
             if (strict && treatment.allInstructions().size() > 2) {
                 throw new FabricPipelinerException(
                         "Treatment contains instructions other " +
@@ -336,6 +322,8 @@ class NextObjectiveTranslator
             treatmentBuilder.popVlan();
         }
 
+        log.info("FabricEgress.egress_next.egress_vlan with PORT {} VLAN_ID {}", outPort.toLong(), vlanIdCriterion.vlanId());
+
         resultBuilder.addFlowRule(flowRule(
                 obj, P4InfoConstants.FABRIC_EGRESS_EGRESS_NEXT_EGRESS_VLAN,
                 selector, treatmentBuilder.build()));
@@ -352,49 +340,6 @@ class NextObjectiveTranslator
         return DefaultTrafficSelector.builder()
                 .matchPi(nextIdCriterion);
     }
-
-    // TODO: re-enable support for xconnext
-    // private void xconnectNext(NextObjective obj, ObjectiveTranslation.Builder resultBuilder)
-    //         throws FabricPipelinerException {
-    //
-    //     final Collection<DefaultNextTreatment> defaultNextTreatments =
-    //             defaultNextTreatments(obj.nextTreatments(), true);
-    //
-    //     final List<PortNumber> outPorts = defaultNextTreatments.stream()
-    //             .map(DefaultNextTreatment::treatment)
-    //             .map(FabricUtils::outputPort)
-    //             .filter(Objects::nonNull)
-    //             .collect(Collectors.toList());
-    //
-    //     if (outPorts.size() != 2) {
-    //         throw new FabricPipelinerException(format(
-    //                 "Handling XCONNECT with %d treatments (ports), but expected is 2",
-    //                 defaultNextTreatments.size()), ObjectiveError.UNSUPPORTED);
-    //     }
-    //
-    //     final PortNumber port1 = outPorts.get(0);
-    //     final PortNumber port2 = outPorts.get(1);
-    //     final TrafficSelector selector1 = nextIdSelectorBuilder(obj.id())
-    //             .matchInPort(port1)
-    //             .build();
-    //     final TrafficTreatment treatment1 = DefaultTrafficTreatment.builder()
-    //             .setOutput(port2)
-    //             .build();
-    //     final TrafficSelector selector2 = nextIdSelectorBuilder(obj.id())
-    //             .matchInPort(port2)
-    //             .build();
-    //     final TrafficTreatment treatment2 = DefaultTrafficTreatment.builder()
-    //             .setOutput(port1)
-    //             .build();
-    //
-    //     resultBuilder.addFlowRule(flowRule(
-    //             obj, P4InfoConstants.FABRIC_INGRESS_NEXT_XCONNECT,
-    //             selector1, treatment1));
-    //     resultBuilder.addFlowRule(flowRule(
-    //             obj, P4InfoConstants.FABRIC_INGRESS_NEXT_XCONNECT,
-    //             selector2, treatment2));
-    //
-    // }
 
     private void multicastNext(NextObjective obj,
                                ObjectiveTranslation.Builder resultBuilder)
@@ -424,38 +369,47 @@ class NextObjectiveTranslator
                 selector, treatment));
     }
 
-    private int selectGroup(NextObjective obj,
+    private void selectGroup(NextObjective obj,
                             ObjectiveTranslation.Builder resultBuilder)
             throws FabricPipelinerException {
 
         final PiTableId hashedTableId = P4InfoConstants.FABRIC_INGRESS_NEXT_HASHED;
-        final List<DefaultNextTreatment> defaultNextTreatments =
+        final List<DefaultNextTreatment> nextTreatments =
                 defaultNextTreatments(obj.nextTreatments(), true);
-        final List<TrafficTreatment> piTreatments = Lists.newArrayList();
 
-        for (DefaultNextTreatment t : defaultNextTreatments) {
-            // Map treatment to PI...
-            piTreatments.add(mapTreatmentToPiIfNeeded(t.treatment(), hashedTableId));
-            // ...and handle egress if necessary.
-            handleEgress(obj, t.treatment(), resultBuilder, false);
+        if (nextTreatments.size() == 0) {
+            log.error("Please provide a treatment");
+            return;
         }
+        TrafficTreatment unparsedTreatment = nextTreatments.get(0).treatment();
 
-        final List<GroupBucket> bucketList = piTreatments.stream()
-                .map(DefaultGroupBucket::createSelectGroupBucket)
-                .collect(Collectors.toList());
+        handleEgress(obj, unparsedTreatment, resultBuilder, false);
 
-        final int groupId = obj.id();
-        final PiGroupKey groupKey = (PiGroupKey) getGroupKey(obj);
+        final long outPort = outputPort(unparsedTreatment).toLong();
+        final PiActionParam outportParam = new PiActionParam(P4InfoConstants.PORT_NUM, outPort);
 
-        resultBuilder.addGroup(new DefaultGroupDescription(
-                deviceId,
-                GroupDescription.Type.SELECT,
-                new GroupBuckets(bucketList),
-                groupKey,
-                groupId,
-                obj.appId()));
+        final long smac = srcMac(unparsedTreatment).toLong();
+        final PiActionParam smacParam = new PiActionParam(P4InfoConstants.SMAC, smac);
 
-        return groupId;
+        final long dmac = dstMac(unparsedTreatment).toLong();
+        final PiActionParam dmacParam = new PiActionParam(P4InfoConstants.DMAC, dmac);
+
+        final PiAction action = PiAction.builder()
+                .withId(P4InfoConstants.FABRIC_INGRESS_NEXT_ROUTING_HASHED)
+                .withParameter(outportParam)
+                .withParameter(smacParam)
+                .withParameter(dmacParam)
+                .build();
+        
+        final TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .piTableAction(action)
+                .build();
+        
+        final TrafficSelector selector = nextIdSelector(obj.id());
+
+        resultBuilder.addFlowRule(flowRule(
+                obj, P4InfoConstants.FABRIC_INGRESS_NEXT_HASHED,
+                selector, treatment));
     }
 
     private int allGroup(NextObjective obj,

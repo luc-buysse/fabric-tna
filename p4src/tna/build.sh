@@ -24,10 +24,8 @@ mkdir -p "${P4C_OUT}"
 # Where the compiler output should be placed to be included in the pipeconf.
 DEST_DIR=${ROOT_DIR}/src/main/resources/p4c-out/${PROFILE}
 
-BASE_P4C_CMD="docker run --rm -v ${P4C_OUT}:${P4C_OUT} \
-  -v ${P4_SRC_DIR}:${P4_SRC_DIR} -v ${DIR}:${DIR} -w ${DIR} --user ${UID} \
-  ${SDE_P4C_DOCKER_IMG} bf-p4c"
-SDE_VER=$( ${BASE_P4C_CMD} --version | cut -d' ' -f2 )
+SDE_VER="9.7.0"
+BASE_P4C_CMD="/root/bf-sde-9.7.0/install/bin/bf-p4c"
 
 SHOW_SENSITIVE_OUTPUT=${SHOW_SENSITIVE_OUTPUT:-"false"}
 
@@ -46,19 +44,17 @@ function base_build() {
     --p4runtime-files ${output_dir}/p4info.txt \
     --p4runtime-force-std-externs \
     ${DIR}/fabric_tna.p4"
-  (
-    if [ "${SHOW_SENSITIVE_OUTPUT}" == "true" ]; then
-      time $COMPILE_P4C_CMD
-    else
-      time $COMPILE_P4C_CMD >/dev/null 2>&1
-    fi
-  )
+  ssh $SWITCH_ADDR "rm -fr p4src"
+  scp -r $ROOT_DIR/p4src $SWITCH_ADDR:~/
+  ssh $SWITCH_ADDR "$(echo "mkdir -p ${output_dir} && ${COMPILE_P4C_CMD}" | sed "s|${ROOT_DIR}|/root|g")"
+  scp -r $SWITCH_ADDR:~/p4src/tna/build/${PROFILE}/sde_9_7_0 $P4C_OUT
+  sed -i "s|/root|${ROOT_DIR}|g" $output_dir/fabric_tna.conf
 
   # Generate the pipeline config binary
   docker run --rm -v "${output_dir}:${output_dir}" -w "${output_dir}" --user ${UID} \
     ${PIPELINE_CONFIG_BUILDER_IMG} \
-    -p4c_conf_file=./fabric_tna.conf \
-    -bf_pipeline_config_binary_file=./pipeline_config.pb.bin
+    -p4c_conf_file=$output_dir/fabric_tna.conf \
+    -bf_pipeline_config_binary_file=$output_dir/pipeline_config.pb.bin
 }
 
 function gen_profile() {
@@ -68,7 +64,7 @@ function gen_profile() {
   # Copy only the relevant files to the pipeconf resources.
   mkdir -p "${DEST_DIR}/${pltf}"
   cp "${output_dir}/p4info.txt" "${DEST_DIR}/${pltf}"
-  cp "${output_dir}/pipeline_config.pb.bin" "${DEST_DIR}/${pltf}/"
+  cp "${output_dir}/pipeline_config.pb.bin" "${DEST_DIR}/${pltf}/pipeline_config.pb.bin"
 }
 
 base_build

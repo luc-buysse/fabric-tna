@@ -56,6 +56,7 @@ public final class Constants {
     public static final int DEFAULT_VLAN = 4094;
     public static final int DEFAULT_PW_TRANSPORT_VLAN = 4090;
     public static final int PKT_IN_MIRROR_SESSION_ID = 0x1FF;
+    public static final int INT_MIRROR_SESSION_ID = 0x200;
 
     public static final int DEFAULT_SLICE_ID = 0;
 

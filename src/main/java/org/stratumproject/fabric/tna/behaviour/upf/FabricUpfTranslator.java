@@ -99,6 +99,8 @@ import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.HDR_UE_ADD
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.HDR_UE_SESSION_ID;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.QFI;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.SESSION_METER_IDX;
+import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TIME_SAMPLING;
+import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.COUNT_SAMPLING;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.SLICE_ID;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TC;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TEID;
@@ -556,7 +558,8 @@ public class FabricUpfTranslator {
      * @throws UpfProgrammableException if the UE session cannot be translated
      */
     public FlowRule sessionUplinkToFabricEntry(UpfSessionUplink ueSession, DeviceId deviceId,
-                                               ApplicationId appId, int priority)
+                                               ApplicationId appId, int priority, 
+                                               int timeSampling, int countSampling)
             throws UpfProgrammableException {
         final PiCriterion match;
         final PiAction.Builder actionBuilder = PiAction.builder();
@@ -569,7 +572,14 @@ public class FabricUpfTranslator {
             actionBuilder.withId(FABRIC_INGRESS_UPF_SET_UPLINK_SESSION_DROP);
         } else {
             actionBuilder.withId(FABRIC_INGRESS_UPF_SET_UPLINK_SESSION);
-            actionBuilder.withParameter(new PiActionParam(SESSION_METER_IDX, (short) ueSession.sessionMeterIdx()));
+
+            ArrayList<PiActionParam> paramList = new ArrayList<>(Arrays.asList(
+                new PiActionParam(SESSION_METER_IDX, (short) ueSession.sessionMeterIdx()),
+                new PiActionParam(TIME_SAMPLING, (byte) timeSampling),
+                new PiActionParam(COUNT_SAMPLING, (byte) countSampling)
+            ));
+
+            actionBuilder.withParameters(paramList);
         }
         return DefaultFlowRule.builder()
                 .forDevice(deviceId)
@@ -593,7 +603,8 @@ public class FabricUpfTranslator {
      * @throws UpfProgrammableException if the UE session cannot be translated
      */
     public FlowRule sessionDownlinkToFabricEntry(UpfSessionDownlink ueSession, DeviceId deviceId,
-                                                 ApplicationId appId, int priority)
+                                                 ApplicationId appId, int priority,
+                                                 int timeSampling, int countSampling)
             throws UpfProgrammableException {
         final PiCriterion match;
         final PiAction.Builder actionBuilder = PiAction.builder();
@@ -607,11 +618,13 @@ public class FabricUpfTranslator {
             actionBuilder.withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION_DROP);
         } else {
             actionBuilder.withParameter(new PiActionParam(TUN_PEER_ID, ueSession.tunPeerId()))
-                    .withParameter(new PiActionParam(SESSION_METER_IDX, (short) ueSession.sessionMeterIdx()));
+                .withParameter(new PiActionParam(SESSION_METER_IDX, (short) ueSession.sessionMeterIdx()));
             if (ueSession.needsBuffering()) {
                 actionBuilder.withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION_BUF);
             } else {
-                actionBuilder.withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION);
+                actionBuilder.withParameter(new PiActionParam(TIME_SAMPLING, timeSampling))
+                    .withParameter(new PiActionParam(COUNT_SAMPLING, countSampling))
+                    .withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION);
             }
         }
         return DefaultFlowRule.builder()

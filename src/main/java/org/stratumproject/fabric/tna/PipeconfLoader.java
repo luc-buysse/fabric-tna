@@ -29,6 +29,13 @@ import org.stratumproject.fabric.tna.behaviour.FabricInterpreter;
 import org.stratumproject.fabric.tna.behaviour.pipeliner.FabricPipeliner;
 import org.stratumproject.fabric.tna.behaviour.upf.FabricUpfProgrammable;
 import org.stratumproject.fabric.tna.inbandtelemetry.IntProgrammable;
+import org.stratumproject.fabric.tna.INTDeviceConfig;
+import org.onosproject.net.config.basics.SubjectFactories;
+import org.onosproject.net.config.NetworkConfigService;
+
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.DeviceId;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -65,6 +72,9 @@ public class PipeconfLoader {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     private ComponentConfigService compCfgService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    private NetworkConfigRegistry cfgService;
+
     private Collection<PiPipeconf> pipeconfs;
 
     private static final String P4INFO_TXT = "p4info.txt";
@@ -74,6 +84,16 @@ public class PipeconfLoader {
     private static final String INT_PROFILE_SUFFIX = "-int";
     private static final String UPF_PROFILE_SUFFIX = "-upf";
     private static final String FULL_PROFILE_SUFFIX = "-upf-int";
+
+    private final ConfigFactory<DeviceId, INTDeviceConfig> deviceConfigFactory =
+        new ConfigFactory<DeviceId, INTDeviceConfig>(
+                SubjectFactories.DEVICE_SUBJECT_FACTORY,
+                INTDeviceConfig.class, "inbandtelemetry") {
+            @Override
+            public INTDeviceConfig createConfig() {
+                return new INTDeviceConfig();
+            }
+        };
 
     @Activate
     public void activate() {
@@ -85,6 +105,9 @@ public class PipeconfLoader {
         compCfgService.preSetProperty(
                 "org.onosproject.net.meter.impl.MeterManager",
                 "userDefinedIndex", "true");
+
+        cfgService.registerConfigFactory(deviceConfigFactory);
+
         // Registers all pipeconf at component activation.
         pipeconfs = buildAllPipeconfs();
         pipeconfs.forEach(pipeconfService::register);

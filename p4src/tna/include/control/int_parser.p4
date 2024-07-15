@@ -44,6 +44,8 @@ parser IntReportParser (packet_in packet,
         /** local/drop_report_header (set valid later) **/
         hdr.local_report_header.queue_occupancy = fabric_md.int_report_md.queue_occupancy;
         hdr.local_report_header.eg_tstamp = fabric_md.int_report_md.eg_tstamp;
+        hdr.local_report_header.pkt_count = fabric_md.int_report_md.pkt_count;
+        hdr.local_report_header.byte_count = fabric_md.int_report_md.byte_count;
         hdr.drop_report_header.drop_reason = fabric_md.int_report_md.drop_reason;
 
         transition set_common_int_headers;

@@ -15,6 +15,7 @@ import org.onosproject.net.DeviceId;
 import org.onosproject.segmentrouting.config.SegmentRoutingDeviceConfig;
 import org.stratumproject.fabric.tna.inbandtelemetry.IntReportConfig;
 import org.stratumproject.fabric.tna.slicing.api.SlicingConfig;
+import org.stratumproject.fabric.tna.INTDeviceConfig;
 
 import static org.junit.Assert.fail;
 
@@ -23,24 +24,24 @@ import static org.junit.Assert.fail;
  */
 public final class TestUtils {
     private static final String INT_REPORT_CONFIG_KEY = "report";
-    private static final String SR_CONFIG_KEY = "segmentrouting";
+    private static final String INT_CONFIG_KEY = "inbandtelemetry";
     private static final String SLICING_CONFIG_KEY = "slicing";
 
     private TestUtils() { }
 
-    public static SegmentRoutingDeviceConfig getSrConfig(DeviceId deviceId, String filename)  {
-        SegmentRoutingDeviceConfig srCfg = new SegmentRoutingDeviceConfig();
+    public static INTDeviceConfig getINTConfig(DeviceId deviceId, String filename)  {
+        INTDeviceConfig intCfg = new INTDeviceConfig();
         InputStream jsonStream = TestUtils.class.getResourceAsStream(filename);
         ObjectMapper mapper = new ObjectMapper();
         JsonNode jsonNode;
         try {
             jsonNode = mapper.readTree(jsonStream);
-            srCfg.init(deviceId, SR_CONFIG_KEY, jsonNode, mapper, config -> { });
+            intCfg.init(deviceId, INT_CONFIG_KEY, jsonNode, mapper, config -> { });
         } catch (IOException e) {
             fail("Got error when reading file " + filename + " : " + e.getMessage());
         }
 
-        return srCfg;
+        return intCfg;
     }
 
     public static IntReportConfig getIntReportConfig(ApplicationId appId, String filename) {

@@ -45,7 +45,6 @@ import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.provider.ProviderId;
-import org.onosproject.segmentrouting.config.SegmentRoutingDeviceConfig;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
@@ -56,7 +55,9 @@ import static org.easymock.EasyMock.reset;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.stratumproject.fabric.tna.utils.TestUtils.getIntReportConfig;
-import static org.stratumproject.fabric.tna.utils.TestUtils.getSrConfig;
+import static org.stratumproject.fabric.tna.utils.TestUtils.getINTConfig;
+
+import org.stratumproject.fabric.tna.INTDeviceConfig;
 
 /**
  * Unit test for the IntManager class.
@@ -69,7 +70,7 @@ public class IntManagerTest extends EasyMockSupport {
     private static final DeviceId DEVICE_ID_2 = DeviceId.deviceId("device:leaf2");
     private static final IntReportConfig INT_CONFIG_1 = getIntReportConfig(APP_ID, "/int-report.json");
     private static final IntReportConfig INT_CONFIG_2 = getIntReportConfig(APP_ID, "/int-report-with-subnets.json");
-    private static final SegmentRoutingDeviceConfig SR_CONFIG_1 = getSrConfig(DEVICE_ID_1, "/sr.json");
+    private static final INTDeviceConfig INT_DEVICE_CONFIG_1 = getINTConfig(DEVICE_ID_1, "/sr.json");
     private static final IpAddress COLLECTOR_IP = IpAddress.valueOf("10.128.0.1");
     @Mock
     private CoreService coreService;
@@ -92,7 +93,7 @@ public class IntManagerTest extends EasyMockSupport {
 
     private Capture<DeviceListener> deviceListener;
     private Capture<NetworkConfigListener> intConfigListener;
-    private Capture<NetworkConfigListener> srConfigListener;
+    private Capture<NetworkConfigListener> intDeviceConfigListener;
     private Capture<HostListener> hostListener;
     private Capture<MastershipListener> mastershipListener;
 
@@ -105,8 +106,8 @@ public class IntManagerTest extends EasyMockSupport {
         netcfgRegistry.registerConfigFactory(anyObject());
         intConfigListener = newCapture();
         netcfgService.addListener(capture(intConfigListener));
-        srConfigListener = newCapture();
-        netcfgService.addListener(capture(srConfigListener));
+        intDeviceConfigListener = newCapture();
+        netcfgService.addListener(capture(intDeviceConfigListener));
         deviceListener = newCapture();
         deviceService.addListener(capture(deviceListener));
         hostListener = newCapture();
@@ -197,9 +198,9 @@ public class IntManagerTest extends EasyMockSupport {
      * Test updating the segment routing device configuration with the config listener.
      */
     @Test
-    public void testUpdateSrConfig() {
+    public void testUpdateIntDeviceConfig() {
         testActivateWithoutConfig();
-        NetworkConfigListener listener = srConfigListener.getValue();
+        NetworkConfigListener listener = intDeviceConfigListener.getValue();
         CompletableFuture<Void> completableFuture = new CompletableFuture<>();
         reset(intProgrammable, netcfgService, deviceService, mastershipService);
         expect(netcfgService.getConfig(APP_ID, IntReportConfig.class)).andReturn(INT_CONFIG_1).anyTimes();
@@ -213,7 +214,7 @@ public class IntManagerTest extends EasyMockSupport {
         expect(mastershipService.isLocalMaster(DEVICE_ID_1)).andReturn(true).anyTimes();
         replay(intProgrammable, netcfgService, deviceService, mastershipService);
         NetworkConfigEvent event = new NetworkConfigEvent(NetworkConfigEvent.Type.CONFIG_ADDED,
-                APP_ID, SR_CONFIG_1, null, SegmentRoutingDeviceConfig.class);
+                APP_ID, INT_DEVICE_CONFIG_1, null, INTDeviceConfig.class);
         assertTrue(listener.isRelevant(event));
         listener.event(event);
         try {
@@ -323,7 +324,7 @@ public class IntManagerTest extends EasyMockSupport {
     private void expectedDeactivateProcess() {
         reset(netcfgService, deviceService, netcfgRegistry, intProgrammable, hostService, mastershipService);
         netcfgService.removeListener(intConfigListener.getValue());
-        netcfgService.removeListener(srConfigListener.getValue());
+        netcfgService.removeListener(intDeviceConfigListener.getValue());
         deviceService.removeListener(deviceListener.getValue());
         hostService.removeListener(hostListener.getValue());
         mastershipService.removeListener(mastershipListener.getValue());

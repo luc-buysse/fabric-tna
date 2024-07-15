@@ -408,6 +408,8 @@ public final class P4InfoConstants {
     public static final PiActionParamId APP_ID = PiActionParamId.of("app_id");
     public static final PiActionParamId APP_METER_IDX =
             PiActionParamId.of("app_meter_idx");
+    public static final PiActionParamId COUNT_SAMPLING =
+            PiActionParamId.of("count_sampling");
     public static final PiActionParamId CPU_PORT =
             PiActionParamId.of("cpu_port");
     public static final PiActionParamId CTR_ID = PiActionParamId.of("ctr_id");
@@ -446,6 +448,8 @@ public final class P4InfoConstants {
     public static final PiActionParamId TEID = PiActionParamId.of("teid");
     public static final PiActionParamId TIMESTAMP_MASK =
             PiActionParamId.of("timestamp_mask");
+    public static final PiActionParamId TIME_SAMPLING =
+            PiActionParamId.of("time_sampling");
     public static final PiActionParamId TUN_DST_ADDR =
             PiActionParamId.of("tun_dst_addr");
     public static final PiActionParamId TUN_PEER_ID =

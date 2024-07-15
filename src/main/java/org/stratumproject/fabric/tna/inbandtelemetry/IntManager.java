@@ -33,12 +33,13 @@ import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
-import org.onosproject.segmentrouting.config.SegmentRoutingDeviceConfig;
 import org.stratumproject.fabric.tna.Constants;
 
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.slf4j.LoggerFactory.getLogger;
 import static org.onlab.util.Tools.groupedThreads;
+
+import org.stratumproject.fabric.tna.INTDeviceConfig;
 
 @Component(immediate = true)
 public class IntManager {
@@ -65,7 +66,7 @@ public class IntManager {
     private ApplicationId appId;
     private ExecutorService eventExecutor;
     private final NetworkConfigListener intReportConfigListener = new IntReportConfigListener();
-    private final NetworkConfigListener srConfigListener = new SrConfigListener();
+    private final NetworkConfigListener srConfigListener = new IntConfigListener();
     private final DeviceListener deviceListener = new IntDeviceListener();
     private final HostListener hostListener = new CollectorHostListener();
     private final MastershipListener mastershipListener = new DeviceMastershipListener();
@@ -122,6 +123,7 @@ public class IntManager {
     }
 
     private void setUpIntConfig(IntReportConfig config, Device device) {
+        log.info("BASIC: {}", checkDevice(device));
         if (checkDevice(device) && !device.as(IntProgrammable.class).setUpIntConfig(config)) {
             log.warn("Failed to set up INT report config for device {}", device.id());
         }
@@ -169,6 +171,8 @@ public class IntManager {
                 switch (event.type()) {
                     case DEVICE_ADDED:
                     case DEVICE_AVAILABILITY_CHANGED:
+                        log.info("A device has been added");
+
                         Device device = event.subject();
                         initDevice(device);
                         IntReportConfig config = netcfgService.getConfig(appId, IntReportConfig.class);
@@ -187,7 +191,7 @@ public class IntManager {
      * To check if the segment routing device config is added or updated since it
      * can be loaded after the INT manager is activated or INT config is loaded.
      */
-    private class SrConfigListener implements NetworkConfigListener {
+    private class IntConfigListener implements NetworkConfigListener {
         @Override
         public void event(NetworkConfigEvent event) {
             eventExecutor.execute(() -> {
@@ -195,7 +199,7 @@ public class IntManager {
                     case CONFIG_ADDED:
                     case CONFIG_UPDATED:
                         event.config()
-                            .map(SegmentRoutingDeviceConfig.class::cast)
+                            .map(INTDeviceConfig.class::cast)
                             .ifPresent(config -> {
                                 IntReportConfig intConfig = netcfgService.getConfig(appId, IntReportConfig.class);
                                 if (intConfig != null) {
@@ -212,7 +216,7 @@ public class IntManager {
 
         @Override
         public boolean isRelevant(NetworkConfigEvent event) {
-            return event.configClass() == SegmentRoutingDeviceConfig.class;
+            return event.configClass() == INTDeviceConfig.class;
         }
     }
 

@@ -182,9 +182,8 @@ class FilteringObjectiveTranslator
             // FIXME SDFAB-52 to complete the work on metadata
             Byte portType = portType(obj);
             if (portType == null) {
-                throw new FabricPipelinerException(
-                        format("Unsupported port_type configuration: metadata=%s", obj.meta()),
-                        ObjectiveError.BADPARAMS);
+                // Default, is useful for managing outside hosts
+                portType = PORT_TYPE_EDGE;
             }
             try {
                 treatmentBuilder.piTableAction(mapFilteringTreatment(obj.meta(),

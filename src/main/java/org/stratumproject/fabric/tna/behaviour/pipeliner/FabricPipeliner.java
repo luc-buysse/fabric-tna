@@ -149,6 +149,7 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
     @Override
     public void next(NextObjective obj) {
         if (obj.op() == Objective.Operation.VERIFY) {
+
             if (obj.type() != NextObjective.Type.HASHED) {
                 log.warn("VERIFY operation not yet supported for NextObjective {}, will return failure :(",
                          obj.type());
@@ -169,6 +170,7 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
         }
 
         if (obj.op() == Objective.Operation.MODIFY && obj.type() != NextObjective.Type.SIMPLE) {
+
             log.warn("MODIFY operation not yet supported for {} NextObjective, will return failure :(",
                      obj.type());
             if (log.isTraceEnabled()) {
@@ -232,9 +234,11 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
 
     private void handleResult(Objective obj, ObjectiveTranslation result) {
         if (result.error().isPresent()) {
+
             fail(obj, result.error().get());
             return;
         }
+
         processGroups(obj, result.groups());
         processFlows(obj, result.flowRules());
         if (obj instanceof NextObjective) {
@@ -247,6 +251,7 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
         // FIXME SDFAB-250 ADD_TO and REMOVE_FROM should update the content
         switch (obj.op()) {
             case REMOVE:
+
                 removeNextGroup(obj);
                 break;
             case ADD:
@@ -264,10 +269,11 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
 
     private void processFlows(Objective objective, Collection<FlowRule> flowRules) {
         if (flowRules.isEmpty()) {
+
             return;
         }
 
-        if (log.isTraceEnabled()) {
+        if (log.isTraceEnabled() || true) {
             log.trace("Objective {} -> Flows {}", objective, flowRules);
         }
 
@@ -286,33 +292,39 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
                 log.warn("Unsupported Objective operation {}", objective.op());
                 return;
         }
+
         flowRuleService.apply(ops.build());
     }
 
     private void processGroups(Objective objective, Collection<GroupDescription> groups) {
         if (groups.isEmpty()) {
+
             return;
         }
 
-        if (log.isTraceEnabled()) {
+        if (log.isTraceEnabled() || true) {
             log.trace("Objective {} -> Groups {}", objective, groups);
         }
 
         switch (objective.op()) {
             case ADD:
+
                 groups.forEach(groupService::addGroup);
                 break;
             case REMOVE:
+
                 groups.forEach(group -> groupService.removeGroup(
                         deviceId, group.appCookie(), objective.appId()));
                 break;
             case ADD_TO_EXISTING:
+
                 groups.forEach(group -> groupService.addBucketsToGroup(
                         deviceId, group.appCookie(), group.buckets(),
                         group.appCookie(), group.appId())
                 );
                 break;
             case MODIFY:
+
                 // Modify is only supported for simple next objective
                 // Replace group bucket directly
                 groups.forEach(group -> groupService.setBucketsForGroup(
@@ -320,6 +332,7 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
                         group.appCookie(), group.appId()));
                 break;
             case REMOVE_FROM_EXISTING:
+
                 groups.forEach(group -> groupService.removeBucketsFromGroup(
                         deviceId, group.appCookie(), group.buckets(),
                         group.appCookie(), group.appId())
@@ -357,6 +370,7 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         final FabricNextGroup nextGroup = new FabricNextGroup(obj.type(), nextMappings);
+
         flowObjectiveStore.putNextGroup(obj.id(), nextGroup);
     }
 
@@ -364,6 +378,10 @@ public class FabricPipeliner extends AbstractFabricHandlerBehavior
         switch (n.type()) {
             case TREATMENT:
                 final PortNumber p = outputPort(n);
+
+                log.info("Getting out : {}", p == null ? "UNKNOWN"
+                        : format("OUTPUT:%s", p.toString()));
+
                 return p == null ? "UNKNOWN"
                         : format("OUTPUT:%s", p.toString());
             case ID:

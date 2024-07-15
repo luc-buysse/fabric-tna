@@ -108,14 +108,6 @@ control Next (inout ingress_headers_t hdr,
      * Hashed table.
      * Execute an action profile selector based on next id.
      */
-    // TODO: Find a good size for Hash
-    ActionProfile(HASHED_ACT_PROFILE_SIZE) hashed_profile;
-    Hash<bit<16>>(HashAlgorithm_t.CRC16) selector_hash;
-    ActionSelector(hashed_profile,
-                   selector_hash,
-                   SelectorMode_t.FAIR,
-                   HASHED_SELECTOR_MAX_GROUP_SIZE,
-                   HASHED_NEXT_TABLE_SIZE) hashed_selector;
     DirectCounter<bit<64>>(CounterType_t.PACKETS_AND_BYTES) hashed_counter;
 
     action output_hashed(FabricPortId_t port_num) {
@@ -131,14 +123,12 @@ control Next (inout ingress_headers_t hdr,
     table hashed {
         key = {
             fabric_md.next_id           : exact @name("next_id");
-            fabric_md.ecmp_hash         : selector;
         }
         actions = {
             output_hashed;
             routing_hashed;
             @defaultonly nop;
         }
-        implementation = hashed_selector;
         counters = hashed_counter;
         const default_action = nop();
         size = HASHED_NEXT_TABLE_SIZE;

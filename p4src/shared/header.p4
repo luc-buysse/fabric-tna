@@ -221,6 +221,8 @@ header local_report_header_t {
     bit<5>  pad1;
     bit<19> queue_occupancy;
     bit<32> eg_tstamp;
+    bit<16> pkt_count;
+    bit<16> byte_count;
 }
 
 // Metadata prepended to mirrored packets to generate INT reports.
@@ -241,6 +243,8 @@ header local_report_header_t {
 @pa_no_overlay("egress", "fabric_md.int_report_md.report_type")
 @pa_no_overlay("egress", "fabric_md.int_report_md.flow_hash")
 @pa_no_overlay("egress", "fabric_md.int_report_md.encap_presence")
+@pa_no_overlay("egress", "fabric_md.int_report_md.pkt_count")
+@pa_no_overlay("egress", "fabric_md.int_report_md.byte_count")
 header int_report_metadata_t {
     BridgedMdType_t       bmd_type;
     @padding bit<5>       _pad0;
@@ -262,16 +266,20 @@ header int_report_metadata_t {
     bit<3>                report_type;
     @padding bit<5>       _pad6;
     flow_hash_t           flow_hash;
+    bit<16>               pkt_count;
+    bit<16>               byte_count;
 }
 
 @flexible
 struct int_bridged_metadata_t {
-    bit<3>          report_type;
-    MirrorId_t      mirror_session_id;
-    IntDropReason_t drop_reason;
-    QueueId_t       queue_id;
-    PortId_t        egress_port;
-    IntWipType_t    wip_type;
+    bit<3>               report_type;
+    MirrorId_t           mirror_session_id;
+    IntDropReason_t      drop_reason;
+    QueueId_t            queue_id;
+    PortId_t             egress_port;
+    IntWipType_t         wip_type;
+    TimeSampling_t       time_sampling;
+    CountSampling_t      count_sampling;
 }
 
 struct int_metadata_t {

@@ -43,6 +43,7 @@ import java.util.Arrays;
 
 import static org.onosproject.net.meter.Meter.Unit.BYTES_PER_SEC;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.APP_METER_IDX;
+import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.COUNT_SAMPLING;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.CTR_ID;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.FABRIC_EGRESS_UPF_EG_TUNNEL_PEERS;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.FABRIC_EGRESS_UPF_LOAD_TUNNEL_PARAMS;
@@ -86,6 +87,7 @@ import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.SESSION_ME
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.SLICE_ID;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TC;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TEID;
+import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TIME_SAMPLING;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TUNNEL_DST_ADDR;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TUNNEL_SRC_ADDR;
 import static org.stratumproject.fabric.tna.behaviour.P4InfoConstants.TUNNEL_SRC_PORT;
@@ -152,6 +154,9 @@ public final class TestUpfConstants {
     public static final int PBURST = 1000;
     public static final int CIR = 5000;
     public static final int CBURST = 500;
+
+    public static final int TIME_SAMPLING_VALUE = 2;
+    public static final int COUNT_SAMPLING_VALUE = 1;
 
     public static final UpfGtpTunnelPeer GTP_TUNNEL_PEER = UpfGtpTunnelPeer.builder()
             .withTunnelPeerId(ENB_GTP_TUNNEL_PEER)
@@ -350,6 +355,8 @@ public final class TestUpfConstants {
                     .piTableAction(PiAction.builder()
                             .withId(FABRIC_INGRESS_UPF_SET_UPLINK_SESSION)
                             .withParameter(new PiActionParam(SESSION_METER_IDX, (short) METER_CELL_ID))
+                            .withParameter(new PiActionParam(TIME_SAMPLING, (byte) TIME_SAMPLING_VALUE))
+                            .withParameter(new PiActionParam(COUNT_SAMPLING, (byte) COUNT_SAMPLING_VALUE))
                             .build()).build())
             .withPriority(DEFAULT_PRIORITY)
             .build();
@@ -367,6 +374,8 @@ public final class TestUpfConstants {
                                     .withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION)
                                     .withParameter(new PiActionParam(TUN_PEER_ID, ENB_GTP_TUNNEL_PEER))
                                     .withParameter(new PiActionParam(SESSION_METER_IDX, (short) METER_CELL_ID))
+                                    .withParameter(new PiActionParam(TIME_SAMPLING, (byte) TIME_SAMPLING_VALUE))
+                                    .withParameter(new PiActionParam(COUNT_SAMPLING, (byte) COUNT_SAMPLING_VALUE))
                                     .build()).build())
             .withPriority(DEFAULT_PRIORITY)
             .build();

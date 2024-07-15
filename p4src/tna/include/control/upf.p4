@@ -157,12 +157,15 @@ control UpfIngress(
 #endif // WITH_INT
     }
 
-    action set_downlink_session(tun_peer_id_t tun_peer_id, session_meter_idx_t session_meter_idx) {
+    action set_downlink_session(tun_peer_id_t tun_peer_id, session_meter_idx_t session_meter_idx, TimeSampling_t time_sampling, CountSampling_t count_sampling) {
         sess_hit = true;
         // Set UE IP address.
         ue_session_id = fabric_md.routing_ipv4_dst;
         session_meter_idx_internal = session_meter_idx;
         fabric_md.bridged.upf.tun_peer_id = tun_peer_id;
+
+        fabric_md.bridged.int_bmd.time_sampling = time_sampling;
+        fabric_md.bridged.int_bmd.count_sampling = count_sampling;
     }
 
     action set_downlink_session_buf(tun_peer_id_t tun_peer_id, session_meter_idx_t session_meter_idx) {
@@ -188,13 +191,16 @@ control UpfIngress(
 #endif // WITH_INT
     }
 
-    action set_uplink_session(session_meter_idx_t session_meter_idx) {
+    action set_uplink_session(session_meter_idx_t session_meter_idx, TimeSampling_t time_sampling, CountSampling_t count_sampling) {
         sess_hit = true;
         // Set UE IP address.
         ue_session_id = fabric_md.lkp.ipv4_src;
         session_meter_idx_internal = session_meter_idx;
         // implicit decap
         _gtpu_decap();
+
+        fabric_md.bridged.int_bmd.time_sampling = time_sampling;
+        fabric_md.bridged.int_bmd.count_sampling = count_sampling;
     }
 
     table downlink_sessions {

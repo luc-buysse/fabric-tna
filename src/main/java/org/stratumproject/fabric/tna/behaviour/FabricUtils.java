@@ -6,6 +6,8 @@ package org.stratumproject.fabric.tna.behaviour;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.net.PortNumber;
+import org.onlab.packet.VlanId;
+import org.onlab.packet.MacAddress;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criterion;
@@ -113,6 +115,33 @@ public final class FabricUtils {
     public static PortNumber outputPort(TrafficTreatment treatment) {
         final Instructions.OutputInstruction inst = outputInstruction(treatment);
         return inst == null ? null : inst.port();
+    }
+
+    public static L2ModificationInstruction.ModEtherInstruction ethSrcInstruction(TrafficTreatment treatment) {
+        return (L2ModificationInstruction.ModEtherInstruction) l2Instruction(treatment, L2ModificationInstruction.L2SubType.ETH_SRC);
+    }
+
+    public static MacAddress srcMac(TrafficTreatment treatment) {
+        final L2ModificationInstruction.ModEtherInstruction inst = ethSrcInstruction(treatment);
+        return inst == null ? null : inst.mac();
+    }
+
+    public static L2ModificationInstruction.ModEtherInstruction ethDstInstruction(TrafficTreatment treatment) {
+        return (L2ModificationInstruction.ModEtherInstruction) l2Instruction(treatment, L2ModificationInstruction.L2SubType.ETH_DST);
+    }
+
+    public static MacAddress dstMac(TrafficTreatment treatment) {
+        final L2ModificationInstruction.ModEtherInstruction inst = ethDstInstruction(treatment);
+        return inst == null ? null : inst.mac();
+    }
+
+    public static L2ModificationInstruction.ModVlanIdInstruction modVlanIdInstruction(TrafficTreatment treatment) {
+        return (L2ModificationInstruction.ModVlanIdInstruction) l2Instruction(treatment, L2ModificationInstruction.L2SubType.VLAN_ID);
+    }
+
+    public static VlanId modVlanId(TrafficTreatment treatment) {
+        final L2ModificationInstruction.ModVlanIdInstruction inst = modVlanIdInstruction(treatment);
+        return inst == null ? null : inst.vlanId();
     }
 
     public static PortNumber outputPort(NextTreatment treatment) {

@@ -24,6 +24,8 @@ import org.onosproject.net.Host;
 import org.onosproject.net.HostLocation;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.ConfigFactory;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
@@ -56,7 +58,6 @@ import org.onosproject.net.pi.model.PiTableId;
 import org.onosproject.net.pi.model.PiTableModel;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiActionParam;
-import org.onosproject.segmentrouting.config.SegmentRoutingDeviceConfig;
 import org.stratumproject.fabric.tna.Constants;
 import org.stratumproject.fabric.tna.inbandtelemetry.IntProgrammable;
 import org.stratumproject.fabric.tna.inbandtelemetry.IntReportConfig;
@@ -76,6 +77,8 @@ import static org.stratumproject.fabric.tna.behaviour.FabricUtils.doCareRangeMat
 
 import static org.stratumproject.fabric.tna.Constants.V1MODEL_INT_REPORT_MIRROR_ID;
 import static org.stratumproject.fabric.tna.Constants.V1MODEL_RECIRC_PORT;
+
+import org.stratumproject.fabric.tna.INTDeviceConfig;
 
 /**
  * Implementation of INT programmable behavior for fabric.p4.
@@ -150,24 +153,9 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
         super();
     }
 
-    private boolean setupBehaviour() {
-        deviceId = this.data().deviceId();
-        flowRuleService = handler().get(FlowRuleService.class);
-        groupService = handler().get(GroupService.class);
-        cfgService = handler().get(NetworkConfigService.class);
-        hostService = handler().get(HostService.class);
-        final CoreService coreService = handler().get(CoreService.class);
-        appId = coreService.getAppId(Constants.APP_NAME);
-        if (appId == null) {
-            log.warn("Application ID is null. Cannot initialize behaviour.");
-            return false;
-        }
-        return true;
-    }
-
     @Override
     public boolean init() {
-        if (!setupBehaviour()) {
+               if (!setupBehaviour()) {
             return false;
         }
 
@@ -209,10 +197,26 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
         return true;
     }
 
+    private boolean setupBehaviour() {
+        deviceId = this.data().deviceId();
+        flowRuleService = handler().get(FlowRuleService.class);
+        groupService = handler().get(GroupService.class);
+        cfgService = handler().get(NetworkConfigService.class);
+        hostService = handler().get(HostService.class);
+        final CoreService coreService = handler().get(CoreService.class);
+        appId = coreService.getAppId(Constants.APP_NAME);
+        if (appId == null) {
+            log.warn("Application ID is null. Cannot initialize behaviour.");
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public boolean setUpIntConfig(IntReportConfig config) {
-
         if (!setupBehaviour()) {
+            log.info("Cancelling... :'(");
+
             return false;
         }
         setUpCollectorFlows(config);
@@ -372,57 +376,10 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
         return 0xffffffffL & qmask;
     }
 
-    /**
-     * Gets the SID of the device which collector attached to.
-     * TODO: remove this method once we get SR API done.
-     *
-     * @param collectorIp the IP address of the INT collector
-     * @return the SID of the device, Optional.empty() if we cannot find the SID of
-     *         the device
-     */
-    private Optional<Integer> getSidForCollector(IpAddress collectorIp) {
-        Set<Host> collectorHosts = hostService.getHostsByIp(collectorIp);
-        if (collectorHosts.isEmpty()) {
-            log.warn("Unable to find collector with IP {}, skip for now.", collectorIp);
-            return Optional.empty();
-        }
-        Host collector = collectorHosts.iterator().next();
-        if (collectorHosts.size() > 1) {
-            log.warn("Find more than one host with IP {}, will use {} as collector.",
-                    collectorIp, collector.id());
-        }
-        Set<HostLocation> locations = collector.locations();
-        if (locations.isEmpty()) {
-            log.warn("Unable to find the location of collector {}, skip for now.",
-                    collector.id());
-            return Optional.empty();
-        }
-        HostLocation location = locations.iterator().next();
-        if (locations.size() > 1) {
-            // TODO: revisit this when we want to support dual-homed INT collector.
-            log.warn("Find more than one location for host {}, will use {}",
-                    collector.id(), location);
-        }
-        DeviceId deviceWithCollector = location.deviceId();
-        SegmentRoutingDeviceConfig cfg = cfgService.getConfig(
-                deviceWithCollector, SegmentRoutingDeviceConfig.class);
-        if (cfg == null) {
-            log.error("Missing SegmentRoutingDeviceConfig config for {}, " +
-                    "cannot derive SID for collector", deviceWithCollector);
-            return Optional.empty();
-        }
-        if (cfg.nodeSidIPv4() == -1) {
-            log.error("Missing ipv4NodeSid in segment routing config for device {}",
-                    deviceWithCollector);
-            return Optional.empty();
-        }
-        return Optional.of(cfg.nodeSidIPv4());
-    }
-
-    private FlowRule buildReportEntryWithType(SegmentRoutingDeviceConfig srCfg,
+    private FlowRule buildReportEntryWithType(INTDeviceConfig deviceCfg,
             IntReportConfig intCfg, short bridgedMdType, short reportType, short mirrorType) {
-        final Ip4Address srcIp = srCfg.routerIpv4();
-        final int switchId = srCfg.nodeSidIPv4();
+        final Ip4Address srcIp = deviceCfg.ip();
+        final int switchId = deviceCfg.sid();
 
         if (srcIp == null) {
             log.warn("Invalid switch IP, skip configuring the report table");
@@ -442,40 +399,14 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
                 switchId);
 
         PiAction.Builder reportActionBuilder = PiAction.builder();
-        if (!srCfg.isEdgeRouter()) {
-            // If the device is a spine device, we need to find which
-            // switch is the INT collector attached to and find the SID of that device.
-            // TODO: replace this with SR API.
-            Optional<Integer> sid = getSidForCollector(intCfg.collectorIp());
-            if (sid.isEmpty()) {
-                // Error log will be shown in getSidForCollector method.
-                return null;
-            }
-
-            if ((reportType & (INT_REPORT_TYPE_FLOW | INT_REPORT_TYPE_QUEUE)) != 0) {
-                reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_LOCAL_REPORT_ENCAP_MPLS);
-            } else if (reportType == INT_REPORT_TYPE_DROP) {
-                reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_DROP_REPORT_ENCAP_MPLS);
-            } else {
-                // Invalid report type
-                log.warn("Invalid report type {}", reportType);
-                return null;
-            }
-
-            final PiActionParam monLabelParam = new PiActionParam(
-                    P4InfoConstants.MON_LABEL,
-                    sid.get());
-            reportActionBuilder.withParameter(monLabelParam);
+        if ((reportType & (INT_REPORT_TYPE_FLOW | INT_REPORT_TYPE_QUEUE)) != 0) {
+            reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_LOCAL_REPORT_ENCAP);
+        } else if (reportType == INT_REPORT_TYPE_DROP) {
+            reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_DROP_REPORT_ENCAP);
         } else {
-            if ((reportType & (INT_REPORT_TYPE_FLOW | INT_REPORT_TYPE_QUEUE)) != 0) {
-                reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_LOCAL_REPORT_ENCAP);
-            } else if (reportType == INT_REPORT_TYPE_DROP) {
-                reportActionBuilder.withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_DO_DROP_REPORT_ENCAP);
-            } else {
-                // Invalid report type
-                log.warn("Invalid report type {}", reportType);
-                return null;
-            }
+            // Invalid report type
+            log.warn("Invalid report type {}", reportType);
+            return null;
         }
 
         reportActionBuilder.withParameter(srcIpParam)
@@ -507,25 +438,25 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
     }
 
     private List<FlowRule> buildReportEntries(IntReportConfig intCfg) {
-        final SegmentRoutingDeviceConfig srCfg = cfgService.getConfig(
-                deviceId, SegmentRoutingDeviceConfig.class);
-        if (srCfg == null) {
-            log.error("Missing SegmentRoutingDeviceConfig config for {}, " +
+        final INTDeviceConfig deviceCfg = cfgService.getConfig(
+                deviceId, INTDeviceConfig.class);
+        if (deviceCfg == null) {
+            log.error("INTDeviceConfig config for {}, " +
                     "cannot derive source IP for INT reports", deviceId);
             return Collections.emptyList();
         }
         return Lists.newArrayList(
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_INT_INGRESS_DROP,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_INT_INGRESS_DROP,
                                          INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID),
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
                                          INT_REPORT_TYPE_DROP, MIRROR_TYPE_INT_REPORT),
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
                                          INT_REPORT_TYPE_FLOW, MIRROR_TYPE_INT_REPORT),
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_DEFLECTED,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_DEFLECTED,
                                          INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID),
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
                                          INT_REPORT_TYPE_QUEUE, MIRROR_TYPE_INT_REPORT),
-                buildReportEntryWithType(srCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
+                buildReportEntryWithType(deviceCfg, intCfg, BMD_TYPE_EGRESS_MIRROR,
                                          (short) (INT_REPORT_TYPE_FLOW | INT_REPORT_TYPE_QUEUE),
                                          MIRROR_TYPE_INT_REPORT)
         );

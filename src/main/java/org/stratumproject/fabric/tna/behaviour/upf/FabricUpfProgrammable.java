@@ -830,7 +830,7 @@ public class FabricUpfProgrammable extends AbstractP4RuntimeHandlerBehaviour
 
     private void addUeSessionUplink(UpfSessionUplink ueSession) throws UpfProgrammableException {
         FlowRule fabricUeSession = upfTranslator.sessionUplinkToFabricEntry(
-                ueSession, deviceId, appId, DEFAULT_PRIORITY);
+                ueSession, deviceId, appId, DEFAULT_PRIORITY, 0, 1);
         log.info("Installing {}", ueSession.toString());
         flowRuleService.applyFlowRules(deviceId.hashCode(), fabricUeSession);
         log.debug("Uplink UE session added with flowID {}", fabricUeSession.id().value());
@@ -838,7 +838,8 @@ public class FabricUpfProgrammable extends AbstractP4RuntimeHandlerBehaviour
 
     private void addUeSessionDownlink(UpfSessionDownlink ueSession) throws UpfProgrammableException {
         FlowRule fabricUeSession = upfTranslator.sessionDownlinkToFabricEntry(
-                ueSession, deviceId, appId, DEFAULT_PRIORITY);
+                ueSession, deviceId, appId, DEFAULT_PRIORITY, 0, 1);
+        log.info("Installing downlink session with time sampling: ", ueSession.timeSampling());
         log.info("Installing {}", ueSession.toString());
         flowRuleService.applyFlowRules(deviceId.hashCode(), fabricUeSession);
         log.debug("Downlink UE session added with flowID {}", fabricUeSession.id().value());

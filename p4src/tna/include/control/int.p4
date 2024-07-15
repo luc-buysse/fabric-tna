@@ -7,10 +7,25 @@
 #include "shared/define.p4"
 #include "shared/header.p4"
 
-// By default report every 2^30 ns (~1 second)
-const bit<48> DEFAULT_TIMESTAMP_MASK = 0xffffc0000000;
-// or for hop latency changes greater than 2^8 ns
+const bit<48> TIMESTAMP_MASK_NEVER = 0x000000000000;
+const bit<48> TIMESTAMP_MASK_1MIN = 0xfff000000000;
+const bit<48> TIMESTAMP_MASK_8S = 0xfffe00000000;
+const bit<48> TIMESTAMP_MASK_1S = 0xffffc0000000;
+const bit<48> TIMESTAMP_MASK_250MS = 0xfffff0000000;
+const bit<48> TIMESTAMP_MASK_67MS = 0xfffffc000000;
+const bit<48> TIMESTAMP_MASK_16MS = 0xffffff000000;
+const bit<48> TIMESTAMP_MASK_4MS = 0xffffffc00000;
+
+const bit<16> PACKET_COUNT_MASK_NONE = 0x0000;
+const bit<16> PACKET_COUNT_MASK_256 = 0xff00;
+const bit<16> PACKET_COUNT_MASK_64 = 0xffc0;
+const bit<16> PACKET_COUNT_MASK_16 = 0xfff0;
+const bit<16> PACKET_COUNT_MASK_4 = 0xfffc;
+const bit<16> PACKET_COUNT_MASK_ALL = 0xffff;
+
+// hop latency changes greater than 2^8 ns
 const bit<32> DEFAULT_HOP_LATENCY_MASK = 0xffffff00;
+
 const queue_report_quota_t DEFAULT_QUEUE_REPORT_QUOTA = 1024;
 
 control FlowReportFilter(
@@ -22,7 +37,10 @@ control FlowReportFilter(
 
     Hash<bit<16>>(HashAlgorithm_t.CRC16) digester;
     bit<16> digest;
+    bit<16> packet_len;
     bit<1> flag;
+
+    bit<16> masked_packet_count;
 
     // Bloom filter with 2 hash functions storing flow digests. The digest is
     // the hash of:
@@ -37,6 +55,10 @@ control FlowReportFilter(
     Register<bit<16>, flow_report_filter_index_t>(1 << FLOW_REPORT_FILTER_WIDTH, 0) filter1;
     @hidden
     Register<bit<16>, flow_report_filter_index_t>(1 << FLOW_REPORT_FILTER_WIDTH, 0) filter2;
+    @hidden
+    Register<bit<16>, flow_report_filter_index_t>(1 << FLOW_REPORT_FILTER_WIDTH, 0) packet_count;
+    @hidden
+    Register<bit<16>, flow_report_filter_index_t>(1 << FLOW_REPORT_FILTER_WIDTH, 0) byte_count; 
 
     // Meaning of the result:
     // 1 digest did NOT change
@@ -57,19 +79,94 @@ control FlowReportFilter(
         }
     };
 
+    @reduction_or_group("packet_counter")
+    RegisterAction<bit<16>, flow_report_filter_index_t, bit<16>>(packet_count) inc_packet_count = {
+        void apply(inout bit<16> pkt_count, out bit<16> result) {
+            pkt_count = pkt_count + 16w1;
+            result = pkt_count;
+        }
+    };
+
+    @reduction_or_group("byte_counter")
+    RegisterAction<bit<16>, flow_report_filter_index_t, bit<16>>(byte_count) inc_byte_count = {
+        void apply(inout bit<16> bt_count, out bit<16> result) {
+            bt_count = bt_count + packet_len;
+            result = bt_count;
+        }
+    };
+
+    action set_time_masks(bit<32> hop_latency_mask, bit<48> timestamp_mask) {
+        fabric_md.int_md.hop_latency = fabric_md.int_md.hop_latency & hop_latency_mask;
+        fabric_md.int_md.timestamp = fabric_md.int_md.timestamp & timestamp_mask;
+    }
+
+    table time_sampling {
+        key = {
+            fabric_md.bridged.int_bmd.time_sampling : exact @name("time_sampling");
+        }
+        actions = {
+            set_time_masks;
+        }
+        const entries = {
+            (3w0) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_NEVER);
+            (3w1) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_1MIN);
+            (3w2) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_8S);
+            (3w3) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_1S);
+            (3w4) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_250MS);
+            (3w5) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_67MS);
+            (3w6) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_16MS);
+            (3w7) : set_time_masks(DEFAULT_HOP_LATENCY_MASK, TIMESTAMP_MASK_4MS);
+        }
+        size = 8;
+    }
+
+    action set_count_mask(bit<16> packet_count_mask) {
+        masked_packet_count = fabric_md.int_report_md.pkt_count & packet_count_mask;
+    }
+
+    table count_sampling {
+        key = {
+            fabric_md.bridged.int_bmd.count_sampling : exact @name("count_sampling");
+        }
+        actions = {
+            set_count_mask;
+        }
+
+        const entries = {
+            (3w0) : set_count_mask(PACKET_COUNT_MASK_NONE);
+            (3w1) : set_count_mask(PACKET_COUNT_MASK_256);
+            (3w2) : set_count_mask(PACKET_COUNT_MASK_64);
+            (3w3) : set_count_mask(PACKET_COUNT_MASK_16);
+            (3w4) : set_count_mask(PACKET_COUNT_MASK_4);
+            (3w5) : set_count_mask(PACKET_COUNT_MASK_ALL);
+        }
+        const default_action = set_count_mask(PACKET_COUNT_MASK_256);
+        size = 6;
+    }
+
     apply {
         if (fabric_md.int_report_md.report_type == INT_REPORT_TYPE_FLOW) {
+            time_sampling.apply();
+
             digest = digester.get({ // burp!
                 fabric_md.bridged.base.ig_port,
                 eg_intr_md.egress_port,
-                fabric_md.int_md.hop_latency,
+                //fabric_md.int_md.hop_latency,
                 fabric_md.bridged.base.inner_hash,
                 fabric_md.int_md.timestamp
             });
+
             flag = filter_get_and_set1.execute(fabric_md.bridged.base.inner_hash[31:16]);
             flag = flag | filter_get_and_set2.execute(fabric_md.bridged.base.inner_hash[15:0]);
+
+            packet_len = hdr.ipv4.total_len >> 4;
+            fabric_md.int_report_md.pkt_count = inc_packet_count.execute(fabric_md.bridged.base.inner_hash[31:16]);
+            fabric_md.int_report_md.byte_count = inc_byte_count.execute(fabric_md.bridged.base.inner_hash[31:16]);
+
+            count_sampling.apply();
+
             // Generate report only when ALL register actions detect a change.
-            if (flag == 1) {
+            if (flag == 1 && masked_packet_count != 0) {
                 eg_dprsr_md.mirror_type = (bit<3>)FabricMirrorType_t.INVALID;
             }
         }
@@ -249,10 +346,9 @@ control IntIngress(
     }
 
     apply {
-        // Here we use 0b10000000xx as the mirror session ID where "xx" is the 2-bit
-        // pipeline number(0~3).
-        // FIXME: set mirror_session_id in egress to save bmd resources
+        // Here we use 0b100000000 as the mirror session
         fabric_md.bridged.int_bmd.mirror_session_id = INT_MIRROR_SESSION_BASE ++ ig_intr_md.ingress_port[8:7];
+
         // When the traffic manager deflects a packet, the egress port and queue id
         // of egress intrinsic metadata will be the port and queue used for deflection.
         // We need to bridge the egress port and queue id from ingress to the egress
@@ -333,19 +429,6 @@ control IntEgress (
         }
         default_action = nop();
         const size = INT_QUEUE_REPORT_TABLE_SIZE;
-    }
-
-    action set_config(bit<32> hop_latency_mask, bit<48> timestamp_mask) {
-        fabric_md.int_md.hop_latency = fabric_md.int_md.hop_latency & hop_latency_mask;
-        fabric_md.int_md.timestamp = fabric_md.int_md.timestamp & timestamp_mask;
-    }
-
-    table config {
-        actions = {
-            @defaultonly set_config;
-        }
-        default_action = set_config(DEFAULT_HOP_LATENCY_MASK, DEFAULT_TIMESTAMP_MASK);
-        const size = 1;
     }
 
     @hidden
@@ -484,7 +567,7 @@ control IntEgress (
             (INT_REPORT_TYPE_FLOW, 0, true): init_int_metadata(INT_REPORT_TYPE_FLOW|INT_REPORT_TYPE_QUEUE);
             (INT_REPORT_TYPE_FLOW, 1, false): init_int_metadata(INT_REPORT_TYPE_DROP);
             (INT_REPORT_TYPE_FLOW, 1, true): init_int_metadata(INT_REPORT_TYPE_DROP);
-            // Packets which does not tracked by the watchlist table
+            // Packets which are not tracked by the watchlist table
             (INT_REPORT_TYPE_NO_REPORT, 0, true): init_int_metadata(INT_REPORT_TYPE_QUEUE);
             (INT_REPORT_TYPE_NO_REPORT, 1, true): init_int_metadata(INT_REPORT_TYPE_QUEUE);
         }
@@ -529,7 +612,6 @@ control IntEgress (
         // latency which is not quantized.
         queue_latency_thresholds.apply();
 
-        config.apply();
         hdr.report_fixed_header.hw_id = 4w0 ++ eg_intr_md.egress_port[8:7];
 
         // Filtering for drop reports is done after mirroring to handle all drop

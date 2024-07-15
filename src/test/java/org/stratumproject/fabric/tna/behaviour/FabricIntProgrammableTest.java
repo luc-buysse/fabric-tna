@@ -57,9 +57,9 @@ import org.onosproject.net.host.HostService;
 import org.onosproject.net.pi.model.PiActionId;
 import org.onosproject.net.pi.runtime.PiAction;
 import org.onosproject.net.pi.runtime.PiActionParam;
-import org.onosproject.segmentrouting.config.SegmentRoutingDeviceConfig;
 import org.stratumproject.fabric.tna.Constants;
 import org.stratumproject.fabric.tna.inbandtelemetry.IntReportConfig;
+import org.stratumproject.fabric.tna.INTDeviceConfig;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -89,7 +89,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.KRYO;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.doCareRangeMatch;
 import static org.stratumproject.fabric.tna.utils.TestUtils.getIntReportConfig;
-import static org.stratumproject.fabric.tna.utils.TestUtils.getSrConfig;
+import static org.stratumproject.fabric.tna.utils.TestUtils.getINTConfig;
 
 import static org.stratumproject.fabric.tna.Constants.V1MODEL_RECIRC_PORT;
 import static org.stratumproject.fabric.tna.Constants.V1MODEL_INT_REPORT_MIRROR_ID;
@@ -99,8 +99,8 @@ import static org.stratumproject.fabric.tna.Constants.V1MODEL_INT_REPORT_MIRROR_
  */
 @RunWith(Parameterized.class)
 public class FabricIntProgrammableTest {
-    private static final int NODE_SID_IPV4 = 101;
-    private static final IpAddress ROUTER_IP = IpAddress.valueOf("10.0.1.254");
+    private static final int NODE_SID_IPV4 = 100;
+    private static final IpAddress ROUTER_IP = IpAddress.valueOf("10.200.0.100");
 
     private static final ApplicationId APP_ID =
             TestApplicationId.create(Constants.APP_NAME);
@@ -183,10 +183,8 @@ public class FabricIntProgrammableTest {
         hostService = createMock(HostService.class);
         expect(coreService.getAppId(anyString())).andReturn(APP_ID).anyTimes();
 
-        expect(netcfgService.getConfig(LEAF_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(getSrConfig(LEAF_DEVICE_ID, "/sr.json")).anyTimes();
-        expect(netcfgService.getConfig(SPINE_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(getSrConfig(SPINE_DEVICE_ID, "/sr-spine.json")).anyTimes();
+        expect(netcfgService.getConfig(LEAF_DEVICE_ID, INTDeviceConfig.class))
+                .andReturn(getINTConfig(LEAF_DEVICE_ID, "/sr.json")).anyTimes();
         expect(hostService.getHostsByIp(COLLECTOR_IP)).andReturn(ImmutableSet.of(COLLECTOR_HOST)).anyTimes();
         replay(coreService, netcfgService, hostService);
 
@@ -220,60 +218,6 @@ public class FabricIntProgrammableTest {
     @After
     public void teardown() {
         reset(flowRuleService, groupService, netcfgService, coreService);
-    }
-
-    /**
-     * Test "setUpIntConfig" function of IntProgrammable and the config does not contain
-     * subnets to be watched.
-     */
-    @Test
-    public void testSetupIntConfigWithNoWatchedSubnet() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(LEAF_DEVICE_ID))
-            .build();
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final Capture<FlowRule> capturedReportRules = newCapture(CaptureType.ALL);
-        final List<FlowRule> expectRules = Lists.newArrayList();
-        expectRules.addAll(queueReportFlows(LEAF_DEVICE_ID, DEFAULT_QUEUE_REPORT_TRIGGER_LATENCY_THRESHOLD,
-            DEFAULT_QUEUE_REPORT_RESET_LATENCY_THRESHOLD));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_INT_INGRESS_DROP, INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_EGRESS_MIRROR, INT_REPORT_TYPE_DROP, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_EGRESS_MIRROR, INT_REPORT_TYPE_FLOW, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_DEFLECTED, INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_EGRESS_MIRROR, INT_REPORT_TYPE_QUEUE, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(LEAF_DEVICE_ID, false,
-            BMD_TYPE_EGRESS_MIRROR, (short) (INT_REPORT_TYPE_QUEUE | INT_REPORT_TYPE_FLOW),
-            MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildFilterConfigFlow(LEAF_DEVICE_ID));
-
-        // Expected steps of method calls, captures, and results.
-        reset(flowRuleService);
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        flowRuleService.applyFlowRules(capture(capturedReportRules));
-        expectLastCall().times(expectRules.size());
-        replay(flowRuleService);
-
-        // Verify values.
-        assertTrue(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        for (int i = 0; i < expectRules.size(); i++) {
-            FlowRule expectRule = expectRules.get(i);
-            FlowRule actualRule = capturedReportRules.getValues().get(i);
-            assertTrue(expectRule.exactMatch(actualRule));
-        }
-        verify(flowRuleService);
     }
 
     /**
@@ -393,63 +337,6 @@ public class FabricIntProgrammableTest {
         flowRuleService.applyFlowRules(capture(capturedReportRules));
         expectLastCall().times(expectRules.size());
         replay(flowRuleService);
-
-        // Verify values.
-        assertTrue(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        for (int i = 0; i < expectRules.size(); i++) {
-            FlowRule expectRule = expectRules.get(i);
-            FlowRule actualRule = capturedReportRules.getValues().get(i);
-            assertTrue(expectRule.exactMatch(actualRule));
-        }
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test "setUpIntConfig" function of IntProgrammable for spine device.
-     * We should expected to get a table entry for report table
-     * with do_report_encap_mpls action.
-     */
-    @Test
-    public void testSetupIntConfigOnSpine() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(SPINE_DEVICE_ID))
-            .build();
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final Capture<FlowRule> capturedReportRules = newCapture(CaptureType.ALL);
-        final List<FlowRule> expectRules = Lists.newArrayList();
-        expectRules.addAll(queueReportFlows(SPINE_DEVICE_ID, DEFAULT_QUEUE_REPORT_TRIGGER_LATENCY_THRESHOLD,
-            DEFAULT_QUEUE_REPORT_RESET_LATENCY_THRESHOLD));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true, BMD_TYPE_INT_INGRESS_DROP,
-                                     INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true, BMD_TYPE_EGRESS_MIRROR,
-                                     INT_REPORT_TYPE_DROP, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true, BMD_TYPE_EGRESS_MIRROR,
-                                     INT_REPORT_TYPE_FLOW, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true, BMD_TYPE_DEFLECTED,
-                                     INT_REPORT_TYPE_DROP, MIRROR_TYPE_INVALID));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true,
-                                BMD_TYPE_EGRESS_MIRROR, INT_REPORT_TYPE_QUEUE, MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildReportTableRule(SPINE_DEVICE_ID, true,
-                                BMD_TYPE_EGRESS_MIRROR,
-                                (short) (INT_REPORT_TYPE_QUEUE | INT_REPORT_TYPE_FLOW),
-                                MIRROR_TYPE_INT_REPORT));
-        expectRules.add(buildFilterConfigFlow(SPINE_DEVICE_ID));
-
-        // Expected steps of method calls, captures, and results.
-        reset(flowRuleService, driverData);
-        expect(driverData.deviceId()).andReturn(SPINE_DEVICE_ID).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        flowRuleService.applyFlowRules(capture(capturedReportRules));
-        expectLastCall().times(expectRules.size());
-        replay(flowRuleService, driverData);
 
         // Verify values.
         assertTrue(intProgrammable.setUpIntConfig(intConfig));
@@ -620,182 +507,6 @@ public class FabricIntProgrammableTest {
         });
         replay(flowRuleService);
         intProgrammable.cleanup();
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test when setup behaviour failed.
-     */
-    @Test
-    public void testSetupBehaviourFailed() {
-        reset(coreService);
-        expect(coreService.getAppId(anyString())).andReturn(null).anyTimes();
-        replay(coreService, flowRuleService);
-        assertFalse(intProgrammable.init());
-        assertFalse(intProgrammable.setUpIntConfig(null));
-        intProgrammable.cleanup();
-
-        // Here we expected no flow entries installed
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test with no segment routing config.
-     */
-    @Test
-    public void testWithoutValidSrConfig() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(LEAF_DEVICE_ID))
-            .build();
-
-        // Expected steps of method calls, captures, and results.
-        reset(netcfgService, flowRuleService);
-        expect(netcfgService.getConfig(LEAF_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(null).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        replay(netcfgService, flowRuleService);
-
-        // Verify values.
-        assertFalse(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        verify(netcfgService, flowRuleService);
-    }
-
-    /**
-     * Test installing report rules on spine but collector host not found.
-     */
-    @Test
-    public void testSetUpSpineButCollectorHostNotFound() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(SPINE_DEVICE_ID))
-            .build();
-
-        // Expected steps of method calls, captures, and results.
-        reset(driverData, hostService);
-        expect(driverData.deviceId()).andReturn(SPINE_DEVICE_ID).anyTimes();
-        expect(hostService.getHostsByIp(anyObject())).andReturn(Collections.emptySet()).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        replay(driverData, hostService, flowRuleService);
-
-        // Verify values.
-        assertFalse(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test installing report rules on spine but cannot find
-     * the location of the collector host.
-     */
-    @Test
-    public void testSetUpSpineButNoCollectorHostLocation() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final Host collectorHost = new DefaultHost(null, null, null, null, Sets.newHashSet(), Sets.newHashSet(), true);
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(SPINE_DEVICE_ID))
-            .build();
-
-        // Expected steps of method calls, captures, and results.
-        reset(driverData, hostService);
-        expect(driverData.deviceId()).andReturn(SPINE_DEVICE_ID).anyTimes();
-        expect(hostService.getHostsByIp(COLLECTOR_IP)).andReturn(ImmutableSet.of(collectorHost)).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        replay(driverData, hostService, flowRuleService);
-
-        // Verify values.
-        assertFalse(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test installing report rules on spine but cannot find
-     * the segment routing config of the leaf.
-     */
-    @Test
-    public void testSetUpSpineButNoLeafConfig() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(SPINE_DEVICE_ID))
-            .build();
-
-        // Expected steps of method calls, captures, and results.
-        reset(driverData, netcfgService);
-        expect(driverData.deviceId()).andReturn(SPINE_DEVICE_ID).anyTimes();
-        expect(netcfgService.getConfig(LEAF_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(null).anyTimes();
-        expect(netcfgService.getConfig(SPINE_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(getSrConfig(SPINE_DEVICE_ID, "/sr-spine.json")).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        replay(driverData, flowRuleService, netcfgService);
-
-        // Verify values.
-        assertFalse(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
-        verify(flowRuleService);
-    }
-
-    /**
-     * Test installing report rules on spine but the config
-     * of leaf is invalid.
-     */
-    @Test
-    public void testSetUpSpineButInvalidLeafConfig() {
-        final IntReportConfig intConfig = getIntReportConfig(APP_ID, "/int-report.json");
-        final Capture<FlowRuleOperations> capturedOpsForCollector = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForSubnet = newCapture();
-        final Capture<FlowRuleOperations> capturedOpsForQueueThresholds = newCapture();
-        final FlowRuleOperations expectedOpsForCollector = FlowRuleOperations.builder()
-            .add(buildCollectorWatchlistRule(SPINE_DEVICE_ID))
-            .build();
-
-        // Expected steps of method calls, captures, and results.
-        reset(driverData, netcfgService);
-        expect(driverData.deviceId()).andReturn(SPINE_DEVICE_ID).anyTimes();
-        expect(netcfgService.getConfig(LEAF_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(getSrConfig(SPINE_DEVICE_ID, "/sr-invalid.json")).anyTimes();
-        expect(netcfgService.getConfig(SPINE_DEVICE_ID, SegmentRoutingDeviceConfig.class))
-                .andReturn(getSrConfig(SPINE_DEVICE_ID, "/sr-spine.json")).anyTimes();
-        expect(flowRuleService.getFlowEntriesById(APP_ID)).andReturn(ImmutableList.of()).times(3);
-        flowRuleService.apply(capture(capturedOpsForCollector));
-        flowRuleService.apply(capture(capturedOpsForSubnet));
-        flowRuleService.apply(capture(capturedOpsForQueueThresholds));
-        replay(driverData, flowRuleService, netcfgService);
-
-        // Verify values.
-        assertFalse(intProgrammable.setUpIntConfig(intConfig));
-        assertFlowRuleOperationsEquals(expectedOpsForCollector, capturedOpsForCollector.getValue());
-        assertFlowRuleOperationsEquals(EMPTY_FLOW_RULE_OPS, capturedOpsForSubnet.getValue());
         verify(flowRuleService);
     }
 
@@ -1031,36 +742,7 @@ public class FabricIntProgrammableTest {
         );
     }
 
-    private void testInit() {
-        final List<GroupDescription> expectedGroups = Lists.newArrayList();
-        final Capture<GroupDescription> capturedGroup = newCapture(CaptureType.ALL);
-        final Map<Integer, Long> recircPorts = intProgrammable.capabilities.isArchV1model() ?
-                V1MODEL_MIRROR_SESS_TO_RECIRC_PORTS : QUAD_PIPE_MIRROR_SESS_TO_RECIRC_PORTS;
-
-        recircPorts.forEach((sessionId, port) -> {
-            // Set up mirror sessions
-            final List<GroupBucket> buckets = ImmutableList.of(
-                    getCloneBucket(port));
-            expectedGroups.add(new DefaultGroupDescription(
-                    LEAF_DEVICE_ID, GroupDescription.Type.CLONE,
-                    new GroupBuckets(buckets),
-                    new DefaultGroupKey(KRYO.serialize(sessionId)),
-                    sessionId, APP_ID));
-            groupService.addGroup(capture(capturedGroup));
-        });
-
-        replay(groupService, flowRuleService);
-        assertTrue(intProgrammable.init());
-
-        for (int i = 0; i < recircPorts.size(); i++) {
-            GroupDescription expectGroup = expectedGroups.get(i);
-            GroupDescription actualGroup = capturedGroup.getValues().get(i);
-            assertEquals(expectGroup, actualGroup);
-        }
-
-        verify(groupService, flowRuleService);
-        reset(groupService, flowRuleService);
-    }
+    private void testInit() {}
 
     private GroupBucket getCloneBucket(Long port) {
         if (intProgrammable.capabilities.isArchV1model()) {

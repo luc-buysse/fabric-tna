@@ -108,7 +108,14 @@ _mvn_package: _m2_vol
 		-e MAVEN_OPTS=-Dmaven.repo.local=/.m2 \
 		-e MAVEN_CONFIG=/.m2 \
 		-v $(MVN_CACHE):/.m2 \
-		$(MVN_SETTINGS_MOUNT) $(MAVEN_DOCKER_IMAGE) mvn $(MVN_FLAGS) clean package
+		$(MVN_SETTINGS_MOUNT) $(MAVEN_DOCKER_IMAGE) /bin/bash -c \
+			"mvn install:install-file \
+				-Dfile=onos-api-2.5.10-SNAPSHOT.jar \
+				-DgroupId=org.onosproject \
+				-DartifactId=onos-api \
+				-Dversion=2.5.10-SNAPSHOT \
+				-Dpackaging=jar \
+			&& mvn ${MVN_FLAGS} clean package"
 
 pipeconf: _mvn_package
 	$(info *** ONOS pipeconf .oar package created succesfully)

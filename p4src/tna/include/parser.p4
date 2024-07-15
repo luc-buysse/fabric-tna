@@ -84,6 +84,7 @@ parser FabricIngressParser (packet_in  packet,
 #ifdef WITH_INT
     state parse_int_wip_ipv4 {
         hdr.ethernet.setValid();
+        hdr.ethernet.dst_addr = 0x000000000000;
         hdr.eth_type.setValid();
         hdr.eth_type.value = ETHERTYPE_IPV4;
         fabric_md.bridged.int_bmd.wip_type = INT_IS_WIP;

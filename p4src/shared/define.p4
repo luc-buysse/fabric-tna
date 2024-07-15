@@ -271,4 +271,10 @@ enum bit<8> IntDropReason_t {
     DROP_REASON_ROUTING_V6_DROP = 171
 }
 
+typedef bit<3> TimeSampling_t;
+const TimeSampling_t DEFAULT_TIME_SAMPLING_VALUE = 2;
+
+typedef bit<3> CountSampling_t;
+const CountSampling_t DEFAULT_COUNT_SAMPLING_VALUE = 1;
+
 #endif // __DEFINE__

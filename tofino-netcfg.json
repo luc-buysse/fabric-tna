@@ -1,10 +1,61 @@
 {
   "devices": {
-    "device:leaf-1": {
+    "device:leaf1": {
       "basic": {
-        "managementAddress": "grpc://10.0.0.1:9559?device_id=1",
+        "managementAddress": "grpc://10.10.8.92:9559?device_id=1",
         "driver": "stratum-tofino",
-        "pipeconf": "org.stratumproject.fabric.montara_sde_9_7_0"
+        "pipeconf": "org.stratumproject.fabric-upf-int.montara_sde_9_7_0"
+      },
+      "inbandtelemetry": {
+        "sid": 100,
+        "port": 222,
+        "ip": "10.200.0.100"
+      }
+    }
+  },
+  "hosts": {
+    "e4:1d:2d:09:a6:80/None": {
+      "basic": {
+        "name": "enodeb",
+        "ips": [
+          "10.200.0.130"
+        ],
+        "locations": [
+          "device:leaf1/42"
+        ]
+      }
+    },
+    "e4:1d:2d:09:c5:00/None": {
+      "basic": {
+        "name": "pdn",
+        "ips": [
+          "10.200.0.116"
+        ],
+        "locations": [
+          "device:leaf1/59"
+        ]
+      }
+    }
+  },
+  "apps": {
+    "org.omecproject.up4": {
+      "up4": {
+        "devices": [
+          "device:leaf1"
+        ],
+        "maxUes": 64,
+        "pscEncapEnabled": false
+      }
+    },
+    "org.stratumproject.fabric.tna.inbandtelemetry": {
+      "report": {
+        "collectorIp": "10.10.9.90",
+        "collectorPort": 5500,
+        "minFlowHopLatencyChangeNs": 300,
+        "watchSubnets": [
+          "10.45.0.0/23",
+          "10.200.0.0/24"
+        ]
       }
     }
   }

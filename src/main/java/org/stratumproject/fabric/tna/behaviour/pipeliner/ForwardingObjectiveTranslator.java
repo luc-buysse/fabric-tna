@@ -29,6 +29,8 @@ import org.onosproject.net.pi.runtime.PiActionParam;
 import org.stratumproject.fabric.tna.behaviour.FabricCapabilities;
 import org.stratumproject.fabric.tna.behaviour.P4InfoConstants;
 
+import org.onlab.packet.VlanId;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -42,6 +44,7 @@ import static org.stratumproject.fabric.tna.Constants.PORT_TYPE_INFRA;
 import static org.stratumproject.fabric.tna.Constants.PORT_TYPE_MASK;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.criterionNotNull;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.outputPort;
+import static org.stratumproject.fabric.tna.behaviour.FabricUtils.modVlanId;
 import static org.stratumproject.fabric.tna.behaviour.FabricUtils.portType;
 
 /**
@@ -97,7 +100,6 @@ class ForwardingObjectiveTranslator
     @Override
     public ObjectiveTranslation doTranslate(ForwardingObjective obj)
             throws FabricPipelinerException {
-
         if (!isValidSrMetadata(obj)) {
             throw new FabricPipelinerException(
                     format("Unsupported metadata configuration: metadata=%s", obj.meta()),
@@ -296,11 +298,21 @@ class ForwardingObjectiveTranslator
         return flowRule(obj, tableId, selector, nextIdOrTreatment(obj, tableId));
     }
 
-    private static TrafficTreatment nextIdOrTreatment(
+    private TrafficTreatment nextIdOrTreatment(
             ForwardingObjective obj, PiTableId tableId)
             throws FabricPipelinerException {
         if (obj.nextId() == null) {
-            return obj.treatment();
+            VlanId vlanId = modVlanId(obj.treatment());
+            
+            if (vlanId == null) {
+                return obj.treatment();
+            } else {
+                return DefaultTrafficTreatment.builder()
+                        .piTableAction(
+                                setNextIdAction((int) vlanId.toShort(),
+                                                NEXT_ID_ACTIONS.get(tableId)))
+                        .build();
+            }
         } else {
             if (!NEXT_ID_ACTIONS.containsKey(tableId)) {
                 throw new FabricPipelinerException(format(
