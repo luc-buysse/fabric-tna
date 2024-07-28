@@ -321,33 +321,7 @@ public class FabricIntProgrammable extends AbstractFabricHandlerBehavior
             log.warn("Failed to add report rule to {}", deviceId);
             return false;
         }
-        final FlowRule filterConfigRule = buildFilterConfigRule(cfg.minFlowHopLatencyChangeNs());
-        flowRuleService.applyFlowRules(filterConfigRule);
-        log.info("Report rule added to {} [{}]", deviceId, filterConfigRule);
         return true;
-    }
-
-    private FlowRule buildFilterConfigRule(int minFlowHopLatencyChangeNs) {
-        final long qmask = getSuitableQmaskForLatencyChange(minFlowHopLatencyChangeNs);
-        final PiActionParam hopLatencyMask = new PiActionParam(P4InfoConstants.HOP_LATENCY_MASK, qmask);
-        final PiActionParam timestampMask = new PiActionParam(P4InfoConstants.TIMESTAMP_MASK, DEFAULT_TIMESTAMP_MASK);
-        final PiAction action =
-                PiAction.builder()
-                        .withId(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_SET_CONFIG)
-                        .withParameter(hopLatencyMask)
-                        .withParameter(timestampMask)
-                        .build();
-        final TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                .piTableAction(action)
-                .build();
-        return DefaultFlowRule.builder()
-                .forDevice(deviceId)
-                .makePermanent()
-                .withPriority(DEFAULT_PRIORITY)
-                .withTreatment(treatment)
-                .fromApp(appId)
-                .forTable(P4InfoConstants.FABRIC_EGRESS_INT_EGRESS_CONFIG)
-                .build();
     }
 
     /**

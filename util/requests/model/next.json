@@ -1,0 +1,39 @@
+{
+    "id": $3,
+    "appId": 174,
+    "type": "HASHED",
+    "operation": "ADD",
+    "treatments": [
+        {
+            "instructions": [
+                {
+                    "type": "OUTPUT",
+                    "port": $0
+                },
+                {
+                    "type": "L2MODIFICATION",
+                    "subtype": "VLAN_POP"
+                },
+                {
+                    "type": "L2MODIFICATION",
+                    "subtype": "ETH_SRC",
+                    "mac": "$1"
+                },
+                {
+                    "type": "L2MODIFICATION",
+                    "subtype": "ETH_DST",
+                    "mac": "$2"
+                }
+            ],
+            "weight": 100
+        }
+    ],
+    "meta": {
+        "criteria": [
+            {
+                "type": "VLAN_VID",
+                "vlanId": 1
+            }
+        ]
+    }
+}

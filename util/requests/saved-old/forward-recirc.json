@@ -1,0 +1,26 @@
+{
+    "appId": 174,
+    "selector": {
+        "criteria": [
+            {
+                "type": "ETH_TYPE",
+                "ethType": 2048
+            },
+            {
+                "type": "IPV4_DST",
+                "ip": "10.10.9.90/32"
+            }
+        ]
+    },
+    "treatment": {
+        "instructions": [
+            {
+                "type": "L2MODIFICATION",
+                "subtype": "VLAN_ID",
+                "vlanId": 3
+            }
+        ]
+    },
+    "flag": "SPECIFIC",
+    "operation": "ADD"
+}

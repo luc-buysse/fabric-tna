@@ -39,14 +39,12 @@ import java.util.Set;
 public class INTDeviceConfig extends Config<DeviceId> {
     private static final String SID = "sid";
     private static final String IP = "ip";
-    private static final String PORT = "port";
 
     @Override
     public boolean isValid() {
-        return hasOnlyFields(SID, IP, PORT) 
+        return hasOnlyFields(SID, IP)
             && sid() != -1
-            && ip() != null
-            && port() != -1;
+            && ip() != null;
     }
 
     /**
@@ -69,15 +67,6 @@ public class INTDeviceConfig extends Config<DeviceId> {
     }
 
     /**
-     * Gets the port number used for INT
-     *
-     * @return The port number used for INT
-     */
-    public int port() {
-        return get(PORT, -1);
-    }
-
-    /**
      * Sets the address of the collector.
      *
      * @param sid switch identifier.
@@ -95,15 +84,5 @@ public class INTDeviceConfig extends Config<DeviceId> {
      */
     public INTDeviceConfig setIp(String ip) {
         return (INTDeviceConfig) setOrClear(IP, ip);
-    }
-
-    /**
-     * Sets the port number used for INT.
-     *
-     * @param port port used for INT.
-     * @return the config of the device INT.
-     */
-    public INTDeviceConfig setPort(int port) {
-        return (INTDeviceConfig) setOrClear(PORT, port);
     }
 }

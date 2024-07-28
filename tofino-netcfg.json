@@ -8,32 +8,7 @@
       },
       "inbandtelemetry": {
         "sid": 100,
-        "port": 222,
         "ip": "10.200.0.100"
-      }
-    }
-  },
-  "hosts": {
-    "e4:1d:2d:09:a6:80/None": {
-      "basic": {
-        "name": "enodeb",
-        "ips": [
-          "10.200.0.130"
-        ],
-        "locations": [
-          "device:leaf1/42"
-        ]
-      }
-    },
-    "e4:1d:2d:09:c5:00/None": {
-      "basic": {
-        "name": "pdn",
-        "ips": [
-          "10.200.0.116"
-        ],
-        "locations": [
-          "device:leaf1/59"
-        ]
       }
     }
   },

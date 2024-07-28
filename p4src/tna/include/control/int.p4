@@ -16,15 +16,15 @@ const bit<48> TIMESTAMP_MASK_67MS = 0xfffffc000000;
 const bit<48> TIMESTAMP_MASK_16MS = 0xffffff000000;
 const bit<48> TIMESTAMP_MASK_4MS = 0xffffffc00000;
 
-const bit<16> PACKET_COUNT_MASK_NONE = 0x0000;
-const bit<16> PACKET_COUNT_MASK_256 = 0xff00;
-const bit<16> PACKET_COUNT_MASK_64 = 0xffc0;
-const bit<16> PACKET_COUNT_MASK_16 = 0xfff0;
-const bit<16> PACKET_COUNT_MASK_4 = 0xfffc;
-const bit<16> PACKET_COUNT_MASK_ALL = 0xffff;
+const bit<16> PACKET_COUNT_MASK_NONE = 0xffff;
+const bit<16> PACKET_COUNT_MASK_256 = 0x00ff;
+const bit<16> PACKET_COUNT_MASK_64 = 0x003f;
+const bit<16> PACKET_COUNT_MASK_16 = 0x000f;
+const bit<16> PACKET_COUNT_MASK_4 = 0x0003;
+const bit<16> PACKET_COUNT_MASK_ALL = 0x0000;
 
 // hop latency changes greater than 2^8 ns
-const bit<32> DEFAULT_HOP_LATENCY_MASK = 0xffffff00;
+const bit<32> DEFAULT_HOP_LATENCY_MASK = 0x00000000;
 
 const queue_report_quota_t DEFAULT_QUEUE_REPORT_QUOTA = 1024;
 
@@ -151,7 +151,6 @@ control FlowReportFilter(
             digest = digester.get({ // burp!
                 fabric_md.bridged.base.ig_port,
                 eg_intr_md.egress_port,
-                //fabric_md.int_md.hop_latency,
                 fabric_md.bridged.base.inner_hash,
                 fabric_md.int_md.timestamp
             });
@@ -625,7 +624,7 @@ control IntEgress (
         //  are a rare event? What happens if a 100Gbps flow gets dropped by an
         //  ingress/egress table (e.g., routing table miss, egress vlan table
         //  miss, etc.)?
-        drop_report_filter.apply(hdr, fabric_md, eg_dprsr_md);
+        //drop_report_filter.apply(hdr, fabric_md, eg_dprsr_md);
 
         if (fabric_md.int_report_md.isValid()) {
             // Packet is mirrored (egress or deflected) or an ingress drop.

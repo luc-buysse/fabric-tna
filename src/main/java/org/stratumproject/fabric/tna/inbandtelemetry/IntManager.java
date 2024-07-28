@@ -188,7 +188,7 @@ public class IntManager {
     }
 
     /**
-     * To check if the segment routing device config is added or updated since it
+     * To check if the int device config is added or updated since it
      * can be loaded after the INT manager is activated or INT config is loaded.
      */
     private class IntConfigListener implements NetworkConfigListener {

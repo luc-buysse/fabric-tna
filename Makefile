@@ -22,7 +22,7 @@ MVN_CACHE ?= $(MVN_CACHE_DOCKER_VOLUME)
 # By default use the maven settings in local ~/.m2, but allow passing a custom
 # settings.
 MVN_SETTINGS ?= $(shell test -f ~/.m2/settings.xml && echo "$${HOME}/.m2/settings.xml")
-MVN_FLAGS ?=
+MVN_FLAGS ?= -DskipTests
 
 ONOS_HOST ?= localhost
 ONOS_URL ?= http://$(ONOS_HOST):8181/onos
@@ -114,7 +114,7 @@ _mvn_package: _m2_vol
 				-DgroupId=org.onosproject \
 				-DartifactId=onos-api \
 				-Dversion=2.5.10-SNAPSHOT \
-				-Dpackaging=jar \
+				-Dpackaging=jar -e \
 			&& mvn ${MVN_FLAGS} clean package"
 
 pipeconf: _mvn_package

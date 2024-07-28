@@ -317,9 +317,7 @@ public class FabricUpfTranslatorTest {
                     TestUpfConstants.UPLINK_UE_SESSION,
                     TestUpfConstants.DEVICE_ID,
                     TestUpfConstants.APP_ID,
-                    TestUpfConstants.DEFAULT_PRIORITY,
-                    TestUpfConstants.TIME_SAMPLING_VALUE,
-                    TestUpfConstants.COUNT_SAMPLING_VALUE);
+                    TestUpfConstants.DEFAULT_PRIORITY);
         } catch (UpfProgrammableException e) {
             assertThat("Abstract uplink UE session should correctly " +
                                "translate to Fabric UE session without error",
@@ -339,9 +337,7 @@ public class FabricUpfTranslatorTest {
                     TestUpfConstants.DOWNLINK_UE_SESSION,
                     TestUpfConstants.DEVICE_ID,
                     TestUpfConstants.APP_ID,
-                    TestUpfConstants.DEFAULT_PRIORITY,
-                    TestUpfConstants.TIME_SAMPLING_VALUE,
-                    TestUpfConstants.COUNT_SAMPLING_VALUE);
+                    TestUpfConstants.DEFAULT_PRIORITY);
         } catch (UpfProgrammableException e) {
             assertThat("Abstract downlink UE session should correctly " +
                                "translate to Fabric UE session without error",
@@ -361,9 +357,7 @@ public class FabricUpfTranslatorTest {
                     TestUpfConstants.DOWNLINK_UE_SESSION_DBUF,
                     TestUpfConstants.DEVICE_ID,
                     TestUpfConstants.APP_ID,
-                    TestUpfConstants.DEFAULT_PRIORITY,
-                    TestUpfConstants.TIME_SAMPLING_VALUE,
-                    TestUpfConstants.COUNT_SAMPLING_VALUE);
+                    TestUpfConstants.DEFAULT_PRIORITY);
         } catch (UpfProgrammableException e) {
             assertThat("Abstract downlink DBUF UE session should correctly " +
                                "translate to Fabric UE session without error",

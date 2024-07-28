@@ -558,8 +558,7 @@ public class FabricUpfTranslator {
      * @throws UpfProgrammableException if the UE session cannot be translated
      */
     public FlowRule sessionUplinkToFabricEntry(UpfSessionUplink ueSession, DeviceId deviceId,
-                                               ApplicationId appId, int priority, 
-                                               int timeSampling, int countSampling)
+                                               ApplicationId appId, int priority)
             throws UpfProgrammableException {
         final PiCriterion match;
         final PiAction.Builder actionBuilder = PiAction.builder();
@@ -575,8 +574,8 @@ public class FabricUpfTranslator {
 
             ArrayList<PiActionParam> paramList = new ArrayList<>(Arrays.asList(
                 new PiActionParam(SESSION_METER_IDX, (short) ueSession.sessionMeterIdx()),
-                new PiActionParam(TIME_SAMPLING, (byte) timeSampling),
-                new PiActionParam(COUNT_SAMPLING, (byte) countSampling)
+                new PiActionParam(TIME_SAMPLING, (byte) ueSession.timeSampling()),
+                new PiActionParam(COUNT_SAMPLING, (byte) ueSession.countSampling())
             ));
 
             actionBuilder.withParameters(paramList);
@@ -603,8 +602,7 @@ public class FabricUpfTranslator {
      * @throws UpfProgrammableException if the UE session cannot be translated
      */
     public FlowRule sessionDownlinkToFabricEntry(UpfSessionDownlink ueSession, DeviceId deviceId,
-                                                 ApplicationId appId, int priority,
-                                                 int timeSampling, int countSampling)
+                                                 ApplicationId appId, int priority)
             throws UpfProgrammableException {
         final PiCriterion match;
         final PiAction.Builder actionBuilder = PiAction.builder();
@@ -622,8 +620,8 @@ public class FabricUpfTranslator {
             if (ueSession.needsBuffering()) {
                 actionBuilder.withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION_BUF);
             } else {
-                actionBuilder.withParameter(new PiActionParam(TIME_SAMPLING, timeSampling))
-                    .withParameter(new PiActionParam(COUNT_SAMPLING, countSampling))
+                actionBuilder.withParameter(new PiActionParam(TIME_SAMPLING, ueSession.timeSampling()))
+                    .withParameter(new PiActionParam(COUNT_SAMPLING, ueSession.countSampling()))
                     .withId(FABRIC_INGRESS_UPF_SET_DOWNLINK_SESSION);
             }
         }

@@ -1,0 +1,24 @@
+{
+    "type": "PERMIT",
+    "operation": "ADD",
+    "appId": 174,
+    "key": {
+        "type": "IN_PORT",
+        "port": 93
+    },
+    "conditions": [
+        {
+            "type": "ETH_DST",
+            "mac": "00:00:00:00:00:01"
+        }
+    ],
+    "meta": {
+        "instructions": [
+            {
+                "type": "L2MODIFICATION",
+                "subtype": "VLAN_ID",
+                "vlanId": 1
+            }
+        ]
+    }
+}

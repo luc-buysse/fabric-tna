@@ -169,12 +169,16 @@ public final class TestUpfConstants {
             .withTeid(TEID_VALUE)
             .withTunDstAddr(N3_ADDR)
             .withSessionMeterIdx(METER_CELL_ID)
+            .withTimeSampling(TIME_SAMPLING_VALUE)
+            .withCountSampling(COUNT_SAMPLING_VALUE)
             .build();
 
     public static final UpfSessionDownlink DOWNLINK_UE_SESSION = UpfSessionDownlink.builder()
             .withUeAddress(UE_ADDR)
             .withGtpTunnelPeerId(ENB_GTP_TUNNEL_PEER)
             .withSessionMeterIdx(METER_CELL_ID)
+            .withTimeSampling(TIME_SAMPLING_VALUE)
+            .withCountSampling(COUNT_SAMPLING_VALUE)
             .build();
 
     public static final UpfSessionDownlink DOWNLINK_UE_SESSION_DBUF = UpfSessionDownlink.builder()
